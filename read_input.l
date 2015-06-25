@@ -715,7 +715,7 @@ static inline void rmQuotes(char *str){
 }
 
 
-<WILSONOP,TMOP>{
+<WILSONOP,TMOP,DBTMOP>{
   {SPC}*UseEvenOdd{EQL}yes {
     if(myverbose) printf("  Use even/odd preconditioning line %d operator %d\n", line_of_file, current_operator);
     optr->even_odd_flag = 1;

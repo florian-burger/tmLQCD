@@ -2660,7 +2660,8 @@ extern "C" int mixedsolve_eo_nd (spinor * P_up, spinor * P_dn,
                           max_innersolver_it,
                           innersolver_precision_check_abs, innersolver_precision_check_rel,
                           innersolver_precision_abs, innersolver_precision_rel, use_eo );
-    
+
+    //add up the inner solver iterations
     outercount = outercount + innercount;
     
     // timer
@@ -2742,7 +2743,7 @@ extern "C" int mixedsolve_eo_nd (spinor * P_up, spinor * P_dn,
     if (g_cart_id == 0){ 
       printf("Outer residue at iteration i = %i : %.10e\n", i, rr);
       #ifndef LOWOUTPUT
-       printf("No inner solver iterations: %i\n", outercount);
+       printf("No inner solver iterations: %i\n", innercount);
       #endif
     }
 
@@ -2905,7 +2906,21 @@ extern "C" int mixedsolve_eo_nd (spinor * P_up, spinor * P_dn,
   		#ifdef CUDA_DEBUG
   		  CUDA_CHECK("CUDA error in unbind_texture(). Unbindung the GF texture failed.", "GF texture unbound.");
   		#endif
-      
+  
+		  
+     #ifdef GPU_DOUBLE
+       //for GPU_DOUBLE we have to assign P_up/dn 
+       //(for cpu outer solver this is not necessary, as P_up/dn == x_up/dn
+        #ifdef RELATIVISTIC_BASIS 
+          to_tmlqcd_basis_d<<<gpu_gd_linalg_d, gpu_bd_linalg_d>>> (x_up_d);
+          to_tmlqcd_basis_d<<<gpu_gd_linalg_d, gpu_bd_linalg_d>>> (x_dn_d);      
+        #endif              
+        cudaMemcpy(h2d_spin_d, x_up_d, dev_spinsize_d, cudaMemcpyDeviceToHost);
+        unorder_spin_gpu(h2d_spin_d, P_up); 
+        cudaMemcpy(h2d_spin_d, x_dn_d, dev_spinsize_d, cudaMemcpyDeviceToHost);
+        unorder_spin_gpu(h2d_spin_d, P_dn); 	
+     #endif 		  
+		  
   
   finalize_mixedsolve_eo_nd();
   
@@ -2918,7 +2933,9 @@ extern "C" int mixedsolve_eo_nd (spinor * P_up, spinor * P_dn,
 
   finalize_solver(up_field, nr_sf);
   finalize_solver(dn_field, nr_sf);
-  return(outercount);
+  
+  //indicate no convergence
+  return(-1);
   
   
 }//mixedsolve_eo_nd()
@@ -3551,11 +3568,19 @@ extern "C" int doublesolve_eo_nd (spinor * P_up, spinor * P_dn,
     if ( (g_cart_id == 0) && (g_debug_level > 1) ) printf("Outer iteration i = %i\n", i);
     #endif
 
+  
+    
     order_spin_gpu(r_up, h2d_spin_d);
     cudaMemcpy(dev_spinin_up_d, h2d_spin_d, dev_spinsize_d, cudaMemcpyHostToDevice);      
     order_spin_gpu(r_dn, h2d_spin_d);
     cudaMemcpy(dev_spinin_dn_d, h2d_spin_d, dev_spinsize_d, cudaMemcpyHostToDevice);
- 
+
+    //switch to relativistic basis if necessary
+    #ifdef RELATIVISTIC_BASIS
+      to_relativistic_basis_d<<<gpu_gd_linalg_d, gpu_bd_linalg_d>>> (dev_spinin_up_d);
+      to_relativistic_basis_d<<<gpu_gd_linalg_d, gpu_bd_linalg_d>>> (dev_spinin_dn_d);   
+    #endif   
+    
     ////////////////////////////////////
     // INNER LOOP, CONJUGATE GRADIENT //
     ////////////////////////////////////
@@ -3582,7 +3607,15 @@ extern "C" int doublesolve_eo_nd (spinor * P_up, spinor * P_dn,
         printf("\tinner solver performance:  %.4e Gflop/s\n", double(effectiveflops)/innerclocks/ 1.0e9);
       }
     #endif
-      
+    
+    
+    //return to tmlqcd basis if necessary
+    #ifdef RELATIVISTIC_BASIS 
+      to_tmlqcd_basis_d<<<gpu_gd_linalg_d, gpu_bd_linalg_d>>> (dev_spinout_up_d);
+      to_tmlqcd_basis_d<<<gpu_gd_linalg_d, gpu_bd_linalg_d>>> (dev_spinout_dn_d);      
+    #endif              
+
+    
     //copy result back
     cudaMemcpy(h2d_spin_d, dev_spinout_up_d , dev_spinsize_d, cudaMemcpyDeviceToHost);      
     unorder_spin_gpu(h2d_spin_d, d_up);
@@ -3625,7 +3658,7 @@ extern "C" int doublesolve_eo_nd (spinor * P_up, spinor * P_dn,
     if (g_cart_id == 0){ 
       printf("Outer residue at iteration i = %i : %.10e\n", i, rr);
       #ifndef LOWOUTPUT
-       printf("No inner solver iterations: %i\n", outercount);
+       printf("No inner solver iterations: %i\n", innercount);
       #endif
     }		
     // debug	// is NaN ?
@@ -3637,7 +3670,8 @@ extern "C" int doublesolve_eo_nd (spinor * P_up, spinor * P_dn,
     // aborting ?? // check wether precision is reached ...
     if ( ((rr <= eps_sq) && (rel_prec == 0))  ||  ((rr <= eps_sq*r0r0) && (rel_prec == 1)) ) {
       
-      //we need not assign P_up/dn, as P_up/dn == x_up/dn
+      
+      //NOTE here we need NOT assign P_up/dn, as P_up/dn == x_up/dn
 
         
       #ifdef _USE_MPI
@@ -3682,7 +3716,9 @@ extern "C" int doublesolve_eo_nd (spinor * P_up, spinor * P_dn,
 
   finalize_solver(up_field, nr_sf);
   finalize_solver(dn_field, nr_sf);
-  return(outercount);
+  
+  //indicate no convergence
+  return(-1);
   
   
 }//doublesolve_eo_nd()
