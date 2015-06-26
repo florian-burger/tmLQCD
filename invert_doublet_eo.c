@@ -121,9 +121,6 @@ int invert_doublet_eo(spinor * const Even_new_s, spinor * const Odd_new_s,
       #ifdef HAVE_GPU
 	iter = mixedsolve_eo_nd(Odd_new_s, Odd_new_c, g_spinor_field[DUM_DERI], g_spinor_field[DUM_DERI+1],
 				0.0, max_iter, precision, rel_prec, even_odd_flag, &Qtm_pm_ndpsi);
-      #else
-	if(g_proc_id == 0) printf("Error: GPU code not built in. Aborting!\n");
-        exit(100);
       #endif
       }
       else {
@@ -132,17 +129,10 @@ int invert_doublet_eo(spinor * const Even_new_s, spinor * const Odd_new_s,
       }
   }
   else if (solver_flag == CG) {
-    if(g_proc_id == 0) {
-      printf("# Using MIXEDCG for TMWILSON flavour doublet!\n"); 
-      fflush(stdout);
-    } 
     if (usegpu_flag) {	// GPU, mixed precision solver, shift==0
     #ifdef HAVE_GPU
       iter = doublesolve_eo_nd(Odd_new_s, Odd_new_c, g_spinor_field[DUM_DERI], g_spinor_field[DUM_DERI+1],
 			      0.0, max_iter, precision, rel_prec, even_odd_flag, &Qtm_pm_ndpsi);
-    #else
-      if(g_proc_id == 0) printf("Error: GPU code not built in. Aborting!\n");      
-      exit(100);
     #endif
     }
     else {
