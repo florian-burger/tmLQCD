@@ -112,18 +112,45 @@ int invert_doublet_eo(spinor * const Even_new_s, spinor * const Odd_new_s,
   gamma5(g_spinor_field[DUM_DERI+1], g_spinor_field[DUM_DERI+1], VOLUME/2);
   
   
-  if (usegpu_flag) {	// GPU, mixed precision solver, shift==0
-   #ifdef HAVE_GPU
-    iter = mixedsolve_eo_nd(Odd_new_s, Odd_new_c, g_spinor_field[DUM_DERI], g_spinor_field[DUM_DERI+1],
-			    0.0, max_iter, precision, rel_prec, even_odd_flag, &Qtm_pm_ndpsi);
-   #endif
+  if(solver_flag == MIXEDCG){
+    if(g_proc_id == 0) {
+      printf("# Using CG for TMWILSON flavour doublet!\n"); 
+      fflush(stdout);
+    }    
+    if (usegpu_flag) {	// GPU, mixed precision solver, shift==0
+      #ifdef HAVE_GPU
+	iter = mixedsolve_eo_nd(Odd_new_s, Odd_new_c, g_spinor_field[DUM_DERI], g_spinor_field[DUM_DERI+1],
+				0.0, max_iter, precision, rel_prec, even_odd_flag, &Qtm_pm_ndpsi);
+      #else
+	if(g_proc_id == 0) printf("Error: GPU code not built in. Aborting!\n");
+        exit(100);
+      #endif
+      }
+      else {
+	if(g_proc_id == 0) printf("Error: MIXEDCG solver not implemented for TMWILSON flavour doublet inversion. Aborting!\n");
+        exit(100);
+      }
   }
-  else {
-    iter = cg_her_nd(Odd_new_s, Odd_new_c, g_spinor_field[DUM_DERI], g_spinor_field[DUM_DERI+1],
-		    max_iter, precision, rel_prec, 
-		    VOLUME/2, &Qtm_pm_ndpsi);
+  else if (solver_flag == CG) {
+    if(g_proc_id == 0) {
+      printf("# Using MIXEDCG for TMWILSON flavour doublet!\n"); 
+      fflush(stdout);
+    } 
+    if (usegpu_flag) {	// GPU, mixed precision solver, shift==0
+    #ifdef HAVE_GPU
+      iter = doublesolve_eo_nd(Odd_new_s, Odd_new_c, g_spinor_field[DUM_DERI], g_spinor_field[DUM_DERI+1],
+			      0.0, max_iter, precision, rel_prec, even_odd_flag, &Qtm_pm_ndpsi);
+    #else
+      if(g_proc_id == 0) printf("Error: GPU code not built in. Aborting!\n");      
+      exit(100);
+    #endif
+    }
+    else {
+      iter = cg_her_nd(Odd_new_s, Odd_new_c, g_spinor_field[DUM_DERI], g_spinor_field[DUM_DERI+1],
+		      max_iter, precision, rel_prec, 
+		      VOLUME/2, &Qtm_pm_ndpsi);
+    }
   }
-  
   
   Qtm_dagger_ndpsi(Odd_new_s, Odd_new_c,
 		   Odd_new_s, Odd_new_c);

@@ -808,7 +808,12 @@ static inline void rmQuotes(char *str){
 
 <DBTMSOLVER,TMSOLVER,CSWSOLVER>{
   cg {
-    optr->solver=1;
+    optr->solver=CG;
+    if(myverbose) printf("  Solver set to CG line %d operator %d\n", line_of_file, current_operator);
+    BEGIN(name_caller);
+  }
+  mixedcg {
+    optr->solver=MIXEDCG;
     if(myverbose) printf("  Solver set to CG line %d operator %d\n", line_of_file, current_operator);
     BEGIN(name_caller);
   }
